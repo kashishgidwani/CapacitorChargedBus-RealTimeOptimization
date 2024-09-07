@@ -12,7 +12,7 @@ public class MobileLoginActivity extends AppCompatActivity {
 
     private EditText etMobileNumber, etMobilePassword;
     private Button btnLogin;
-// change 1
+// change 2
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
