@@ -2,8 +2,10 @@ package com.example.bus;
 
 
 import static java.util.Collections.addAll;
+import com.google.firebase.auth.FirebaseAuth;
 
 import android.Manifest;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.location.Location;
@@ -58,23 +60,31 @@ public class BusSearchActivity<PolylineOptions> extends FragmentActivity impleme
     private PlacesClient placesClient;
 
     private EditText pickupLocationInput, dropoffLocationInput;
-    private Button findBusStopButton;
-    private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
-    private Byte PolyUtil;
+    private Button findBusStopButton, signOutButton;
+    private FirebaseAuth mAuth; // Firebase authentication instance
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_bus_search);
 
-        // Initialize Google Places
-        Places.initialize(getApplicationContext(), "YOUR_API_KEY");
-        placesClient = Places.createClient(this);
+        // Initialize Firebase Auth
+        mAuth = FirebaseAuth.getInstance();
 
         // Initialize views
         pickupLocationInput = findViewById(R.id.pickupLocation);
         dropoffLocationInput = findViewById(R.id.dropoffLocation);
         findBusStopButton = findViewById(R.id.findBusStopButton);
+        signOutButton = findViewById(R.id.signOutButton);
+
+        // Set up the sign-out button
+        signOutButton.setOnClickListener(v -> {
+            mAuth.signOut();  // Sign out from Firebase
+            Toast.makeText(BusSearchActivity.this, "Signed out successfully", Toast.LENGTH_SHORT).show();
+            // Redirect to LoginActivity
+            finish();
+            startActivity(new Intent(BusSearchActivity.this, LoginActivity.class));
+        });
 
         // Initialize Google Maps
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
@@ -103,6 +113,11 @@ public class BusSearchActivity<PolylineOptions> extends FragmentActivity impleme
         // Request location permission
         requestLocationPermission();
     }
+
+    private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
+    private Byte PolyUtil;
+
+
 
     private void requestLocationPermission() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
