@@ -2,7 +2,11 @@ package com.example.bus;
 
 
 import static java.util.Collections.addAll;
+
+import com.google.android.libraries.places.api.net.FindAutocompletePredictionsRequest;
 import com.google.firebase.auth.FirebaseAuth;
+
+
 
 import android.Manifest;
 import android.content.Intent;
@@ -71,6 +75,12 @@ public class BusSearchActivity<PolylineOptions> extends FragmentActivity impleme
         // Initialize Firebase Auth
         mAuth = FirebaseAuth.getInstance();
 
+        // Initialize Google Places API
+        if (!Places.isInitialized()) {
+            Places.initialize(getApplicationContext(), "AIzaSyDGDyKJn-KY-2Zyv7hBtkyh0ISmix6iTQg");  // Replace with your Google API key
+        }
+        placesClient = Places.createClient(this);
+
         // Initialize views
         pickupLocationInput = findViewById(R.id.pickupLocation);
         dropoffLocationInput = findViewById(R.id.dropoffLocation);
@@ -87,8 +97,7 @@ public class BusSearchActivity<PolylineOptions> extends FragmentActivity impleme
         });
 
         // Initialize Google Maps
-        SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
-                .findFragmentById(R.id.map);
+        SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
         if (mapFragment != null) {
             mapFragment.getMapAsync(this);
         }
@@ -102,7 +111,6 @@ public class BusSearchActivity<PolylineOptions> extends FragmentActivity impleme
             String dropoffLocation = dropoffLocationInput.getText().toString();
 
             if (!pickupLocation.isEmpty() && !dropoffLocation.isEmpty()) {
-                // Get LatLng from Google Places API
                 fetchPlaceCoordinates(pickupLocation, true);
                 fetchPlaceCoordinates(dropoffLocation, false);
             } else {
@@ -113,6 +121,7 @@ public class BusSearchActivity<PolylineOptions> extends FragmentActivity impleme
         // Request location permission
         requestLocationPermission();
     }
+
 
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
     private Byte PolyUtil;
@@ -136,7 +145,17 @@ public class BusSearchActivity<PolylineOptions> extends FragmentActivity impleme
             startLocationUpdates();
         }
     }
-
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                startLocationUpdates();
+            } else {
+                Toast.makeText(this, "Location permission is required to use this feature.", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
     private void startLocationUpdates() {
         LocationRequest locationRequest = LocationRequest.create();
         locationRequest.setInterval(5000);
@@ -178,28 +197,50 @@ public class BusSearchActivity<PolylineOptions> extends FragmentActivity impleme
 
     // Fetch place coordinates using Google Places API
     private void fetchPlaceCoordinates(String placeName, boolean isPickup) {
-        List<Place.Field> placeFields = Collections.singletonList(Place.Field.LAT_LNG);
+        List<Place.Field> placeFields = Arrays.asList(Place.Field.ID, Place.Field.NAME, Place.Field.LAT_LNG);
 
-        FetchPlaceRequest request = FetchPlaceRequest.builder(placeName, placeFields).build();
+        // Use Autocomplete to get a place ID based on the user input (place name)
+        FindAutocompletePredictionsRequest request = FindAutocompletePredictionsRequest.builder()
+                .setQuery(placeName)
+                .build();
 
-        placesClient.fetchPlace(request).addOnSuccessListener(response -> {
-            Place place = response.getPlace();
-            if (place.getLatLng() != null) {
-                if (isPickup) {
-                    pickupLatLng = place.getLatLng();
-                    addPickupMarker();
-                } else {
-                    dropoffLatLng = place.getLatLng();
-                    addDropoffMarker();
-                    if (pickupLatLng != null && dropoffLatLng != null) {
-                        showRouteOnMap(pickupLatLng, dropoffLatLng);  // Fetch directions after both locations are available
+        placesClient.findAutocompletePredictions(request).addOnSuccessListener(response -> {
+            if (!response.getAutocompletePredictions().isEmpty()) {
+                String placeId = response.getAutocompletePredictions().get(0).getPlaceId();
+
+                // Fetch the place details using the place ID
+                FetchPlaceRequest placeRequest = FetchPlaceRequest.builder(placeId, placeFields).build();
+                placesClient.fetchPlace(placeRequest).addOnSuccessListener(placeResponse -> {
+                    Place place = placeResponse.getPlace();
+                    LatLng latLng = place.getLatLng();
+
+                    if (latLng != null) {
+                        if (isPickup) {
+                            pickupLatLng = latLng;
+                            addPickupMarker();
+                        } else {
+                            dropoffLatLng = latLng;
+                            addDropoffMarker();
+                        }
+
+                        // Show route if both pickup and dropoff locations are available
+                        if (pickupLatLng != null && dropoffLatLng != null) {
+                            showRouteOnMap(pickupLatLng, dropoffLatLng);
+                        }
                     }
-                }
+                }).addOnFailureListener(e -> {
+                    Toast.makeText(BusSearchActivity.this, "Place not found: " + placeName, Toast.LENGTH_SHORT).show();
+                });
+            } else {
+                Toast.makeText(BusSearchActivity.this, "No predictions found for: " + placeName, Toast.LENGTH_SHORT).show();
             }
         }).addOnFailureListener(e -> {
-            Toast.makeText(BusSearchActivity.this, "Place not found", Toast.LENGTH_SHORT).show();
+            Toast.makeText(BusSearchActivity.this, "Autocomplete failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         });
     }
+
+
+
 
     private void addPickupMarker() {
         if (pickupMarker != null) pickupMarker.remove();
@@ -216,7 +257,7 @@ public class BusSearchActivity<PolylineOptions> extends FragmentActivity impleme
         OkHttpClient client = new OkHttpClient();
         String url = "https://maps.googleapis.com/maps/api/directions/json?origin=" + pickupLatLng.latitude + "," +
                 pickupLatLng.longitude + "&destination=" + dropoffLatLng.latitude + "," + dropoffLatLng.longitude +
-                "&key=YOUR_API_KEY";
+                "&key=AIzaSyDGDyKJn-KY-2Zyv7hBtkyh0ISmix6iTQg";
 
         Request request = new Request.Builder().url(url).build();
 
@@ -251,8 +292,6 @@ public class BusSearchActivity<PolylineOptions> extends FragmentActivity impleme
             mMap.addPolyline((com.google.android.gms.maps.model.PolylineOptions) options);
         }
     }
-
-
 
 
     @Override
