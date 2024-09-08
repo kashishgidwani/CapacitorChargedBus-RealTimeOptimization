@@ -25,14 +25,18 @@ public class LoginActivity extends AppCompatActivity {
     @Override
     public void onStart() {
         super.onStart();
-        // Check if user is signed in (non-null) and redirect to HomeActivity
+        // Initialize Firebase Auth
+        mAuth = FirebaseAuth.getInstance();
+
+        // Check if user is signed in (non-null) and redirect to HomeActivity or BusSearchActivity
         FirebaseUser currentUser = mAuth.getCurrentUser();
         if (currentUser != null) {
-            Intent intent = new Intent(LoginActivity.this, HomeActivity.class);
+            Intent intent = new Intent(LoginActivity.this, BusSearchActivity.class);
             startActivity(intent);
-            finish();
+            finish(); // Close LoginActivity
         }
     }
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,6 +63,7 @@ public class LoginActivity extends AppCompatActivity {
                 }
 
                 // Sign in using Firebase Authentication
+                // Sign in using Firebase Authentication
                 mAuth.signInWithEmailAndPassword(email, password)
                         .addOnCompleteListener(LoginActivity.this, new OnCompleteListener<AuthResult>() {
                             @Override
@@ -67,10 +72,10 @@ public class LoginActivity extends AppCompatActivity {
                                     Log.d(TAG, "signInWithEmail:success");
                                     Toast.makeText(LoginActivity.this, "Login successful!", Toast.LENGTH_SHORT).show();
 
-                                    // Redirect to HomeActivity after login success
-                                    Intent intent = new Intent(LoginActivity.this, HomeActivity.class);
+                                    // Redirect to BusSearchActivity after login success
+                                    Intent intent = new Intent(LoginActivity.this, BusSearchActivity.class);
                                     startActivity(intent);
-                                    finish();
+                                    finish();  // Close LoginActivity
                                 } else {
                                     Log.w(TAG, "signInWithEmail:failure", task.getException());
                                     Toast.makeText(LoginActivity.this, "Authentication failed: " + task.getException().getMessage(),
@@ -78,7 +83,9 @@ public class LoginActivity extends AppCompatActivity {
                                 }
                             }
                         });
+
             }
         });
     }
 }
+
